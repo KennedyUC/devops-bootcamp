@@ -1,10 +1,40 @@
+variable "env" {
+  description = "environment"
+  type        = string
+}
+
 variable "project_name" {
   description = "name of the project"
   type        = string
 }
 
-variable "env" {
-  description = "environment"
+variable "vpc_cidr" {
+  description = "cidr block for the VPC"
+  type        = string
+}
+
+variable "enable_vpc_dns" {
+  description = "enable vpc dns"
+  type        = bool
+}
+
+variable "subnet_count" {
+  description = "subnet count"
+  type        = number
+}
+
+variable "subnet_bits" {
+  description = "number of subnet bits to use for the subnet"
+  type        = number
+}
+
+variable "k8s_cluster_name" {
+  description = "kubernetes cluster name"
+  type        = string
+}
+
+variable "k8s_version" {
+  description = "kubernetes version"
   type        = string
 }
 
@@ -43,17 +73,17 @@ variable "capacity_type" {
   type        = string
 }
 
-variable "private_subnets_id" {
-  description = "list of private subnets id"
-  type        = list
-}
-
-variable "cluster_name" {
-  description = "name of the eks cluster"
+variable "aws_region" {
+  description = "aws region"
   type        = string
 }
 
-variable "k8s_version" {
-  description = "kubernetes version of the eks cluster"
+variable "user_access_key" {
+  description = "user access key"
+  type        = string
+}
+
+variable "user_secret_key" {
+  description = "user secret key"
   type        = string
 }

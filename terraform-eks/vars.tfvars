@@ -6,6 +6,7 @@ enable_vpc_dns      = true
 subnet_count        = 2
 subnet_bits         = 8
 
+k8s_cluster_name    = "test_cluster"
 k8s_version         = "1.26"
 
 instance_type       = "t3.micro"
