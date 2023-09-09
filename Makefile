@@ -27,4 +27,4 @@ build-backend:
 .PHONY: build-frontend
 build-frontend:
 	docker build frontend -t $(DOCKER_REPO)/web:$(IMAGE_TAG) -f containers/Dockerfile.web
-	docker push "$(DOCKER_REPO)/web:$(IMAGE_TAG)"
+	docker push $(DOCKER_REPO)/web:$(IMAGE_TAG)
