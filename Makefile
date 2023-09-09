@@ -19,12 +19,12 @@ skaffold-build-local:
 skaffold-build:
 	skaffold build  --platform linux/amd64 --default-repo=$(DOCKER_REPO) --push
 
-.PHONY: docker-build-backend
-docker-build-backend:
+.PHONY: build-backend
+build-backend:
 	docker build backend -t $(DOCKER_REPO)/api:$(IMAGE_TAG) -f containers/Dockerfile.api
 	docker push $(DOCKER_REPO)/api:$(IMAGE_TAG)
 
-.PHONY: docker-build-frontend
-docker-build-frontend:
+.PHONY: build-frontend
+build-frontend:
 	docker build frontend -t "$(DOCKER_REPO)/$(IMAGE_TAG)" -f containers/Dockerfile.web
 	docker push "$(DOCKER_REPO)/web:$(IMAGE_TAG)"
