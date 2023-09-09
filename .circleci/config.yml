@@ -6,24 +6,16 @@ jobs:
       - image: circleci/python:3.8
     steps:
       - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
       - run:
-          name: Install Docker and Make
+          name: Install Make
           command: |
             sudo apt-get update
             sudo apt-get install make -y
-            sudo apt install apt-transport-https ca-certificates curl software-properties-common
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add
-            sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
-            sudo apt update
-            apt-cache policy docker-ce
-            sudo apt install docker-ce
-            sudo usermod -aG docker $USER && newgrp docker
-            
-            docker --version
             make --version
-            
       - run:
-          name: Build frontend
+          name: Build Frontend
           command: |
             make docker-login DOCKER_REPO=${DOCKER_REPO} DOCKER_PASSWORD=${DOCKER_PASSWORD}
             make build-frontend IMAGE_TAG=${IMAGE_TAG}
@@ -33,22 +25,14 @@ jobs:
       - image: circleci/python:3.8
     steps:
       - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
       - run:
           name: Install Docker and Make
           command: |
             sudo apt-get update
             sudo apt-get install make -y
-            sudo apt install apt-transport-https ca-certificates curl software-properties-common
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add
-            sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
-            sudo apt update
-            apt-cache policy docker-ce
-            sudo apt install docker-ce
-            sudo usermod -aG docker $USER && newgrp docker
-            
-            docker --version
             make --version
-            
       - run:
           name: Build Backend
           command: |
