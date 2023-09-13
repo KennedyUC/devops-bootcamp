@@ -1,16 +1,5 @@
 version: 2.1
 
-parameters: 
-  app_namespace:
-    type: string
-    default: test_app
-  eks_cluster:
-    type: string
-    default: test_cluster
-  aws_region:
-    type: string
-    default: us-east-1
-
 commands:
   install_awscli:
     description: Install AWSCLI, Tar, GZIP, Kubectl, yq & Curl
@@ -43,9 +32,9 @@ commands:
           command: 
             echo Destroying EKS Resources for ${CIRCLE_WORKFLOW_ID:0:7}
             terraform destroy -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
-                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="region=${aws_region}" \
+                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="region=${AWS_REGION}" \
                               -var="state_file_path=${STATE_FILE_PATH}" \
-                              -var="k8s_cluster_name=${eks_cluster}"
+                              -var="k8s_cluster_name=${EKS_CLUSTER}"
             
 jobs:
   build-frontend:
@@ -123,6 +112,8 @@ jobs:
   deploy-eks:
     docker:
       - image: hashicorp/terraform:1.5
+    environment:
+      AWS_REGION: "us-east-1"
     steps:
       - checkout
       - install_awscli
@@ -131,7 +122,7 @@ jobs:
           command: |
             aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
             aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
-            aws configure set default.region ${aws_region} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
             aws configure set default.output csv --profile default
       - run:
           name: Provision EKS Resources
@@ -145,9 +136,9 @@ jobs:
             else
               echo "Bucket exists. Proceeding with deployment..."  
               terraform apply -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
-                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="region=${aws_region}" \
+                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="region=${AWS_REGION}" \
                               -var="state_s3_bucket=${STATE_S3_BUCKET}" -var="state_file_path=${STATE_FILE_PATH}" \
-                              -var="k8s_cluster_name=${eks_cluster}"
+                              -var="k8s_cluster_name=${EKS_CLUSTER}"
             fi
 
       - destroy-eks
@@ -155,6 +146,10 @@ jobs:
   deploy-frontend:
     docker:
       - image: hashicorp/terraform:1.5
+    environment:
+      AWS_REGION: "us-east-1"
+      APP_NAMESPACE: "test_app"
+      EKS_CLUSTER: "test_cluster"
     steps:
       - checkout
       - install_awscli
@@ -163,17 +158,17 @@ jobs:
           command: |
             aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
             aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
-            aws configure set default.region ${aws_region} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
             aws configure set default.output csv --profile default
       - run:
           name: Update kubectl config with EKS cluster
           command: |
-            if aws eks --region ${aws_region} describe-cluster --name ${eks_cluster} 2>&1 | grep -q 'error'; then
+            if aws eks --region ${AWS_REGION} describe-cluster --name ${EKS_CLUSTER} 2>&1 | grep -q 'error'; then
               echo "Error: EKS cluster does not exist or there was an error."
               exit 1
             else
               echo "EKS cluster exists and is active. Updating kubectl config..."
-              aws eks --region ${aws_region} update-kubeconfig --name ${eks_cluster}
+              aws eks --region ${AWS_REGION} update-kubeconfig --name ${EKS_CLUSTER}
             fi
       - run:
           name: Verify connection to EKS
@@ -185,26 +180,30 @@ jobs:
       - run:
           name: Deploy Application manifests 
           command: |
-            if ! kubectl get ns ${app_namespace}_frontend > /dev/null 2>&1; then
-              kubectl create ns ${app_namespace}_frontend
+            if ! kubectl get ns ${APP_NAMESPACE}_frontend > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}_frontend
             fi
 
-            kubectl apply -n ${app_namespace}_frontend  -f kubernetes/
-            frontend_app_name=$(kubectl ${app_namespace}_frontend get deployments -o=jsonpath='{.items[0].metadata.name}')
-            kubectl -n ${app_namespace}_frontend rollout status deployment/frontend_app_name
+            kubectl apply -n ${APP_NAMESPACE}_frontend  -f kubernetes/
+            frontend_app_name=$(kubectl ${APP_NAMESPACE}_frontend get deployments -o=jsonpath='{.items[0].metadata.name}')
+            kubectl -n ${APP_NAMESPACE}_frontend rollout status deployment/frontend_app_name
       - run:
           name: Wait for 1 minute
           command: sleep 60
       - run:
           name: Verify the deployment
           command: |
-            kubectl get pods,svc -n ${app_namespace}
+            kubectl get pods,svc -n ${APP_NAMESPACE}
             
       - destroy-environment
   
   deploy-backend:
     docker:
       - image: hashicorp/terraform:1.5
+    environment:
+      AWS_REGION: "us-east-1"
+      APP_NAMESPACE: "test_app"
+      EKS_CLUSTER: "test_cluster"
     steps:
       - checkout
       - install_awscli
@@ -213,17 +212,17 @@ jobs:
           command: |
             aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
             aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
-            aws configure set default.region ${aws_region} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
             aws configure set default.output csv --profile default
       - run:
           name: Update kubectl config with EKS cluster
           command: |
-            if aws eks --region ${aws_region} describe-cluster --name ${eks_cluster} 2>&1 | grep -q 'error'; then
+            if aws eks --region ${AWS_REGION} describe-cluster --name ${EKS_CLUSTER} 2>&1 | grep -q 'error'; then
               echo "Error: EKS cluster does not exist or there was an error."
               exit 1
             else
               echo "EKS cluster exists and is active. Updating kubectl config..."
-              aws eks --region ${aws_region} update-kubeconfig --name ${eks_cluster}
+              aws eks --region ${AWS_REGION} update-kubeconfig --name ${EKS_CLUSTER}
             fi
       - run:
           name: Verify connection to EKS
@@ -235,20 +234,20 @@ jobs:
       - run:
           name: Deploy Application manifests 
           command: |
-            if ! kubectl get ns ${app_namespace}_backend > /dev/null 2>&1; then
-              kubectl create ns ${app_namespace}_backend
+            if ! kubectl get ns ${APP_NAMESPACE}_backend > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}_backend
             fi
 
-            kubectl apply -n ${app_namespace}_backend  -f kubernetes/
-            backend_app_name=$(kubectl ${app_namespace}_backend get deployments -o=jsonpath='{.items[0].metadata.name}')
-            kubectl -n ${app_namespace}_backend rollout status deployment/backend_app_name
+            kubectl apply -n ${APP_NAMESPACE}_backend  -f kubernetes/
+            backend_app_name=$(kubectl ${APP_NAMESPACE}_backend get deployments -o=jsonpath='{.items[0].metadata.name}')
+            kubectl -n ${APP_NAMESPACE}_backend rollout status deployment/backend_app_name
       - run:
           name: Wait for 1 minute
           command: sleep 60
       - run:
           name: Verify the deployment
           command: |
-            kubectl get pods,svc -n ${app_namespace}
+            kubectl get pods,svc -n ${APP_NAMESPACE}
             
       - destroy-environment
 
@@ -275,26 +274,12 @@ workflows:
           requires: [build-backend]
       - deploy-eks:
           requires: [scan-frontend, scan-backend]
-          parameters:
-            aws_region: <<parameters.aws_region>>
           filters:
             branches:
               only: [main]
       - deploy-frontend:
           requires: [deploy-eks]
-          parameters:
-            app_namespace: <<parameters.app_namespace>>
-            eks_cluster: <<parameters.eks_cluster>>
-            aws_region: <<parameters.aws_region>>
       - deploy-backend:
           requires: [deploy-eks]
-          parameters:
-            app_namespace: <<parameters.app_namespace>>
-            eks_cluster: <<parameters.eks_cluster>>
-            aws_region: <<parameters.aws_region>>
       # - cleanup:
       #     requires: [deploy-backend, deploy-frontend]
-            # parameters:
-            # app_namespace: <<parameters.app_namespace>>
-            # eks_cluster: <<parameters.eks_cluster>>
-            # aws_region: <<parameters.aws_region>>
