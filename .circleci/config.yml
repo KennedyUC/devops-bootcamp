@@ -245,6 +245,7 @@ jobs:
           name: Update the backend deployment script with the latest image
           command: |
             yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/backend/api-deployment.yaml
+            yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/db:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/backend/db-deployment.yaml
       - run:
           name: Deploy Application manifests 
           command: |
