@@ -6,7 +6,6 @@ enable_vpc_dns      = true
 subnet_count        = 2
 subnet_bits         = 8
 
-k8s_cluster_name    = "test_cluster"
 k8s_version         = "1.26"
 
 instance_type       = "t3.micro"
@@ -17,6 +16,5 @@ node_disk_size      = 20
 ami_type            = "AL2_x86_64"
 capacity_type       = "ON_DEMAND"
 
-aws_region          = "us-east-1"
-user_access_key     = "XXXX"
-user_secret_key     = "XXXX"
+# state_s3_bucket       = ""
+# state_file_path     = "*.tfstate"

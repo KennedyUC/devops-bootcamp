@@ -24,6 +24,11 @@ build-backend:
 	docker build backend -t $(DOCKER_REPO)/api:$(IMAGE_TAG) -f containers/Dockerfile.api
 	docker push $(DOCKER_REPO)/api:$(IMAGE_TAG)
 
+.PHONY: build-db
+build-db:
+	docker build backend -t $(DOCKER_REPO)/db:$(IMAGE_TAG) -f containers/Dockerfile.db
+	docker push $(DOCKER_REPO)/db:$(IMAGE_TAG)
+
 .PHONY: build-frontend
 build-frontend:
 	docker build frontend -t $(DOCKER_REPO)/web:$(IMAGE_TAG) -f containers/Dockerfile.web
