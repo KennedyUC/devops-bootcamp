@@ -282,7 +282,7 @@ workflows:
           requires: [scan-frontend, scan-backend]
           filters:
             branches:
-              only: [main]
+              only: [dev]
       - deploy-frontend:
           requires: [deploy-eks]
       - deploy-backend:
