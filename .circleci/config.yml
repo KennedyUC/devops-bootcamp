@@ -190,7 +190,7 @@ jobs:
       - run:
           name: Update the frontend deployment script with the latest image
           command: |
-            yq e -i '.spec.template.spec.containers[0].image = ${DOCKER_REPO}/web:${CIRCLE_WORKFLOW_ID:0:7}' ./kubernetes/frontend/web-deployment.yaml
+            yq e -i '.spec.template.spec.containers[0].image = "${DOCKER_REPO}/web:${CIRCLE_WORKFLOW_ID:0:7}"' ./kubernetes/frontend/web-deployment.yaml
       - run:
           name: Deploy Application manifests 
           command: |
@@ -244,7 +244,7 @@ jobs:
       - run:
           name: Update the backend deployment script with the latest image
           command: |
-            yq e -i '.spec.template.spec.containers[0].image = ${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}' ./kubernetes/backend/api-deployment.yaml
+            yq e -i '.spec.template.spec.containers[0].image = "${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}"' ./kubernetes/backend/api-deployment.yaml
       - run:
           name: Deploy Application manifests 
           command: |
