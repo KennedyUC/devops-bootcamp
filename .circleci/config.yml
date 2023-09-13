@@ -209,7 +209,7 @@ jobs:
           command: |
             kubectl get pods,svc -n ${APP_NAMESPACE}
             
-      - destroy-eks
+      # - destroy-eks
   
   deploy-backend:
     docker:
@@ -263,7 +263,7 @@ jobs:
           command: |
             kubectl get pods,svc -n ${APP_NAMESPACE}
             
-      - destroy-eks
+      # - destroy-eks
 
   clean-up:
     docker:
