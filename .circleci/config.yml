@@ -162,7 +162,7 @@ jobs:
       - image: circleci/python:3.8
     environment:
       AWS_REGION: "us-east-1"
-      APP_NAMESPACE: "test-app"
+      APP_NAMESPACE: "todo-web"
       EKS_CLUSTER: "test_cluster"
     steps:
       - checkout
@@ -194,13 +194,13 @@ jobs:
       - run:
           name: Deploy Application manifests 
           command: |
-            if ! kubectl get ns ${APP_NAMESPACE}-frontend > /dev/null 2>&1; then
-              kubectl create ns ${APP_NAMESPACE}-frontend
+            if ! kubectl get ns ${APP_NAMESPACE} > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}
             fi
 
-            kubectl apply -n ${APP_NAMESPACE}-frontend  -f kubernetes/
-            frontend_app_name=$(kubectl ${APP_NAMESPACE}-frontend get deployments -o=jsonpath='{.items[0].metadata.name}')
-            kubectl -n ${APP_NAMESPACE}-frontend rollout status deployment/frontend_app_name
+            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/
+            frontend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
+            kubectl -n ${APP_NAMESPACE} rollout status deployment/frontend_app_name
       - run:
           name: Wait for 1 minute
           command: sleep 60
@@ -216,7 +216,7 @@ jobs:
       - image: circleci/python:3.8
     environment:
       AWS_REGION: "us-east-1"
-      APP_NAMESPACE: "test-app"
+      APP_NAMESPACE: "todo-api"
       EKS_CLUSTER: "test_cluster"
     steps:
       - checkout
@@ -248,13 +248,13 @@ jobs:
       - run:
           name: Deploy Application manifests 
           command: |
-            if ! kubectl get ns ${APP_NAMESPACE}-backend > /dev/null 2>&1; then
-              kubectl create ns ${APP_NAMESPACE}-backend
+            if ! kubectl get ns ${APP_NAMESPACE} > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}
             fi
 
-            kubectl apply -n ${APP_NAMESPACE}-backend  -f kubernetes/
-            backend_app_name=$(kubectl ${APP_NAMESPACE}-backend get deployments -o=jsonpath='{.items[0].metadata.name}')
-            kubectl -n ${APP_NAMESPACE}-backend rollout status deployment/backend_app_name
+            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/
+            backend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
+            kubectl -n ${APP_NAMESPACE} rollout status deployment/backend_app_name
       - run:
           name: Wait for 1 minute
           command: sleep 60
@@ -280,20 +280,20 @@ jobs:
 workflows:
   dev:
     jobs:
-      # - build-frontend
-      # - build-backend
-      # - scan-frontend:
-      #     requires: [build-frontend]
-      # - scan-backend:
-      #     requires: [build-backend]
-      # - deploy-eks:
-      #     requires: [scan-frontend, scan-backend]
-      #     filters:
-      #       branches:
-      #         only: [dev]
-      # - deploy-frontend:
-      #     requires: [deploy-eks]
-      # - deploy-backend:
-      #     requires: [deploy-eks]
-      - clean-up
-          #requires: [deploy-backend, deploy-frontend]
+      - build-frontend
+      - build-backend
+      - scan-frontend:
+          requires: [build-frontend]
+      - scan-backend:
+          requires: [build-backend]
+      - deploy-eks:
+          requires: [scan-frontend, scan-backend]
+          filters:
+            branches:
+              only: [dev]
+      - deploy-frontend:
+          requires: [deploy-eks]
+      - deploy-backend:
+          requires: [deploy-eks]
+      # - clean-up:
+      #     #requires: [deploy-backend, deploy-frontend]
