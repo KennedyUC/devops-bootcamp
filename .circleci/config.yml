@@ -190,8 +190,7 @@ jobs:
       - run:
           name: Update the frontend deployment script with the latest image
           command: |
-            new-image="${DOCKER_REPO}/web:${CIRCLE_WORKFLOW_ID:0:7}"
-            yq e -i '.spec.template.spec.containers[0].image = $new-image' ./kubernetes/frontend/web-deployment.yaml
+            yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/web:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/frontend/web-deployment.yaml
       - run:
           name: Deploy Application manifests 
           command: |
@@ -245,8 +244,7 @@ jobs:
       - run:
           name: Update the backend deployment script with the latest image
           command: |
-            new-image="${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}"
-            yq e -i '.spec.template.spec.containers[0].image = $new-image' ./kubernetes/backend/api-deployment.yaml
+            yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/backend/api-deployment.yaml
       - run:
           name: Deploy Application manifests 
           command: |
@@ -302,21 +300,20 @@ jobs:
 workflows:
   debug:
     jobs:
-      - yq-debug
-      # - build-frontend
-      # - build-backend
-      # - scan-frontend:
-      #     requires: [build-frontend]
-      # - scan-backend:
-      #     requires: [build-backend]
-      # - deploy-eks:
-      #     requires: [scan-frontend, scan-backend]
-      #     filters:
-      #       branches:
-      #         only: [dev]
-      # - deploy-frontend:
-      #     requires: [deploy-eks]
-      # - deploy-backend:
-      #     requires: [deploy-eks]
+      - build-frontend
+      - build-backend
+      - scan-frontend:
+          requires: [build-frontend]
+      - scan-backend:
+          requires: [build-backend]
+      - deploy-eks:
+          requires: [scan-frontend, scan-backend]
+          filters:
+            branches:
+              only: [dev]
+      - deploy-frontend:
+          requires: [deploy-eks]
+      - deploy-backend:
+          requires: [deploy-eks]
       # - clean-up
           #requires: [deploy-backend, deploy-frontend]
