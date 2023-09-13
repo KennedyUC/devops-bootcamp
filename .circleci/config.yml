@@ -290,7 +290,10 @@ jobs:
             sudo chmod a+x /usr/local/bin/yq
       - run:
           name: Update Backend Manifest
-          command: yq e -i '.spec.template.spec.containers[0].image = "${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}"' ./kubernetes/backend/api-deployment.yaml
+          command: |
+            echo ${DOCKER_REPO}
+            echo ${CIRCLE_WORKFLOW_ID:0:7}
+            yq e -i '.spec.template.spec.containers[0].image = "${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}"' ./kubernetes/backend/api-deployment.yaml
       - run:
           name: Check Update
           command: cat ./kubernetes/backend/api-deployment.yaml
