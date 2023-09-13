@@ -38,7 +38,7 @@ commands:
           command: 
             echo Destroying EKS Resources for ${CIRCLE_WORKFLOW_ID:0:7}
             terraform destroy -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
-                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="region=${AWS_REGION}" \
+                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}" \
                               -var="k8s_cluster_name=${EKS_CLUSTER}"
             
 jobs:
@@ -141,7 +141,7 @@ jobs:
             else
               echo "Bucket exists. Proceeding with deployment..."  
               terraform apply -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
-                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="region=${AWS_REGION}" \
+                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}" \
                               -var="k8s_cluster_name=${EKS_CLUSTER}"
             fi
 
