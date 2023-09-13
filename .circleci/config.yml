@@ -295,5 +295,5 @@ workflows:
       #     requires: [deploy-eks]
       # - deploy-backend:
       #     requires: [deploy-eks]
-      - clean-up:
+      - clean-up
           #requires: [deploy-backend, deploy-frontend]
