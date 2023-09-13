@@ -31,9 +31,6 @@ commands:
 
   destroy-eks:
     description: Destroy the EKS resources given a workflow ID.
-    environment:
-      AWS_REGION: "us-east-1"
-      EKS_CLUSTER: "test_cluster"
     steps:
       - run:
           name: Destroy EKS Resources
