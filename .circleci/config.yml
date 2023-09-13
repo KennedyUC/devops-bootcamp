@@ -119,6 +119,7 @@ jobs:
       - image: circleci/python:3.8
     environment:
       AWS_REGION: "us-east-1"
+      EKS_CLUSTER: "test_cluster"
     steps:
       - checkout
       - install_awscli
