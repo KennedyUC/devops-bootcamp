@@ -39,6 +39,11 @@ commands:
             AWS_REGION="us-east-1"
             EKS_CLUSTER="test_cluster"
             echo Destroying EKS Resources for ${CIRCLE_WORKFLOW_ID:0:7}
+
+            if [ "$(basename $PWD)" != "terraform-eks" ]; then
+                cd terraform-eks
+            fi
+          
             terraform destroy -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
                               -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}" \
                               -var="k8s_cluster_name=${EKS_CLUSTER}"
