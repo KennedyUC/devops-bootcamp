@@ -45,7 +45,7 @@ commands:
             fi
           
             terraform init
-            
+
             terraform destroy -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
                               -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}" \
                               -var="k8s_cluster_name=${EKS_CLUSTER}"
@@ -162,7 +162,7 @@ jobs:
       - image: circleci/python:3.8
     environment:
       AWS_REGION: "us-east-1"
-      APP_NAMESPACE: "test_app"
+      APP_NAMESPACE: "test-app"
       EKS_CLUSTER: "test_cluster"
     steps:
       - checkout
@@ -280,20 +280,20 @@ jobs:
 workflows:
   dev:
     jobs:
-      # - build-frontend
-      # - build-backend
-      # - scan-frontend:
-      #     requires: [build-frontend]
-      # - scan-backend:
-      #     requires: [build-backend]
-      # - deploy-eks:
-      #     requires: [scan-frontend, scan-backend]
-      #     filters:
-      #       branches:
-      #         only: [dev]
-      # - deploy-frontend:
-      #     requires: [deploy-eks]
-      # - deploy-backend:
-      #     requires: [deploy-eks]
-      - clean-up
-          # requires: [deploy-backend, deploy-frontend]
+      - build-frontend
+      - build-backend
+      - scan-frontend:
+          requires: [build-frontend]
+      - scan-backend:
+          requires: [build-backend]
+      - deploy-eks:
+          requires: [scan-frontend, scan-backend]
+          filters:
+            branches:
+              only: [dev]
+      - deploy-frontend:
+          requires: [deploy-eks]
+      - deploy-backend:
+          requires: [deploy-eks]
+      # - clean-up:
+      #     requires: [deploy-backend, deploy-frontend]
