@@ -297,7 +297,7 @@ jobs:
             echo ${CIRCLE_WORKFLOW_ID:0:7}
             test="${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}"
             echo $test
-            yq e -i '.spec.template.spec.containers[0].image = ${test}' ./kubernetes/backend/api-deployment.yaml
+            yq e -i '.spec.template.spec.containers[0].image = $test' ./kubernetes/backend/api-deployment.yaml
       - run:
           name: Check Update
           command: cat ./kubernetes/backend/api-deployment.yaml
