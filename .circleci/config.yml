@@ -190,7 +190,7 @@ jobs:
       - run:
           name: Update the frontend deployment script with the latest image
           command: |
-            yq e -i '.spec.template.spec.containers[0].image = "${DOCKER_REPO}/web:${CIRCLE_WORKFLOW_ID:0:7}"' ./kubernetes/web-deployment.yaml
+            yq e -i '.spec.template.spec.containers[0].image = "${DOCKER_REPO}/web:${CIRCLE_WORKFLOW_ID:0:7}"' ./kubernetes/frontend/web-deployment.yaml
       - run:
           name: Deploy Application manifests 
           command: |
@@ -198,12 +198,12 @@ jobs:
               kubectl create ns ${APP_NAMESPACE}
             fi
 
-            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/
+            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/frontend/
             frontend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
-            kubectl -n ${APP_NAMESPACE} rollout status deployment/frontend_app_name
+            kubectl -n ${APP_NAMESPACE} rollout status deployment/${frontend_app_name}
       - run:
-          name: Wait for 1 minute
-          command: sleep 60
+          name: Wait for 2 minutes
+          command: sleep 120
       - run:
           name: Verify the deployment
           command: |
@@ -244,7 +244,7 @@ jobs:
       - run:
           name: Update the backend deployment script with the latest image
           command: |
-            yq e -i '.spec.template.spec.containers[0].image = "${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}"' ./kubernetes/api-deployment.yaml
+            yq e -i '.spec.template.spec.containers[0].image = "${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}"' ./kubernetes/backend/api-deployment.yaml
       - run:
           name: Deploy Application manifests 
           command: |
@@ -252,12 +252,12 @@ jobs:
               kubectl create ns ${APP_NAMESPACE}
             fi
 
-            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/
+            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/backend/
             backend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
-            kubectl -n ${APP_NAMESPACE} rollout status deployment/backend_app_name
+            kubectl -n ${APP_NAMESPACE} rollout status deployment/${backend_app_name}
       - run:
-          name: Wait for 1 minute
-          command: sleep 60
+          name: Wait for 2 minutes
+          command: sleep 120
       - run:
           name: Verify the deployment
           command: |
