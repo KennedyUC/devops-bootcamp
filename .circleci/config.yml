@@ -195,7 +195,7 @@ jobs:
           command: |
             kubectl get pods,svc -n ${APP_NAMESPACE}
             
-      - destroy-environment
+      - destroy-eks
   
   deploy-backend:
     docker:
@@ -249,7 +249,7 @@ jobs:
           command: |
             kubectl get pods,svc -n ${APP_NAMESPACE}
             
-      - destroy-environment
+      - destroy-eks
 
   clean-up:
     docker:
@@ -261,7 +261,7 @@ jobs:
           name: Trigger Cleanup
           command: exit 1
             
-      - destroy-environment
+      - destroy-eks
           
 workflows:
   dev:
