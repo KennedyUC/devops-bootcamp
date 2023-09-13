@@ -279,46 +279,47 @@ jobs:
             
       - destroy-eks
 
-  # yq-debug:
-  #   docker:
-  #     - image: circleci/python:3.8
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         name: Install yq
-  #         command: |
-  #           sudo apt-get update
-  #           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-  #           sudo chmod a+x /usr/local/bin/yq
-  #     - run:
-  #         name: Update Backend Manifest
-  #         command: |
-  #           echo ${DOCKER_REPO}
-  #           echo ${CIRCLE_WORKFLOW_ID:0:7}
-  #           test="${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}"
-  #           echo $test
-  #           yq e -i '.spec.template.spec.containers[0].image = $test' ./kubernetes/backend/api-deployment.yaml
-  #     - run:
-  #         name: Check Update
-  #         command: cat ./kubernetes/backend/api-deployment.yaml
+  yq-debug:
+    docker:
+      - image: circleci/python:3.8
+    steps:
+      - checkout
+      - run:
+          name: Install yq
+          command: |
+            sudo apt-get update
+            sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+            sudo chmod a+x /usr/local/bin/yq
+      - run:
+          name: Update Backend Manifest
+          command: |
+            echo ${DOCKER_REPO}
+            echo ${CIRCLE_WORKFLOW_ID:0:7}
+            test="${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}"
+            echo $test
+            yq e -i '.spec.template.spec.containers[0].image = ${test}' ./kubernetes/backend/api-deployment.yaml
+      - run:
+          name: Check Update
+          command: cat ./kubernetes/backend/api-deployment.yaml
           
 workflows:
-  dev:
+  debug:
     jobs:
-      - build-frontend
-      - build-backend
-      - scan-frontend:
-          requires: [build-frontend]
-      - scan-backend:
-          requires: [build-backend]
-      - deploy-eks:
-          requires: [scan-frontend, scan-backend]
-          filters:
-            branches:
-              only: [dev]
-      - deploy-frontend:
-          requires: [deploy-eks]
-      - deploy-backend:
-          requires: [deploy-eks]
+      - yq-debug
+      # - build-frontend
+      # - build-backend
+      # - scan-frontend:
+      #     requires: [build-frontend]
+      # - scan-backend:
+      #     requires: [build-backend]
+      # - deploy-eks:
+      #     requires: [scan-frontend, scan-backend]
+      #     filters:
+      #       branches:
+      #         only: [dev]
+      # - deploy-frontend:
+      #     requires: [deploy-eks]
+      # - deploy-backend:
+      #     requires: [deploy-eks]
       # - clean-up
           #requires: [deploy-backend, deploy-frontend]
