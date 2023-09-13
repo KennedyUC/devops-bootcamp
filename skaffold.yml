@@ -1,0 +1,23 @@
+apiVersion: skaffold/v2beta29
+kind: Config
+metadata: 
+  name: skaffold-deployment
+build:
+  tagPolicy:
+    sha256: {}
+  # defines where to find the code at build time and where to push the resulting image
+  artifacts:
+  - image: app-api
+    context: backend
+    docker:
+      dockerfile: containers/Dockerfile.api
+    sync:
+      infer:
+      - '**/*'
+  - image: app-web
+    context: frontend
+    docker:
+      dockerfile: containers/Dockerfile.web
+    sync:
+      infer:
+      - '**/*'
