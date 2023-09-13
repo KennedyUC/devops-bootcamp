@@ -20,8 +20,14 @@ commands:
             sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
             sudo chmod a+x /usr/local/bin/yq
 
+            TERRAFORM_VERSION=$(curl -s https://api.github.com/repos/hashicorp/terraform/releases/latest | grep tag_name | cut -d: -f2 | tr -d \"\,\v | awk '{$1=$1};1')
+            wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+            unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+            sudo mv terraform /usr/local/bin/
+
             aws --version
             kubectl version --client
+            terraform --version
 
   destroy-eks:
     description: Destroy the EKS resources given a workflow ID.
@@ -111,7 +117,7 @@ jobs:
 
   deploy-eks:
     docker:
-      - image: hashicorp/terraform:1.5
+      - image: circleci/python:3.8
     environment:
       AWS_REGION: "us-east-1"
     steps:
@@ -145,7 +151,7 @@ jobs:
 
   deploy-frontend:
     docker:
-      - image: hashicorp/terraform:1.5
+      - image: circleci/python:3.8
     environment:
       AWS_REGION: "us-east-1"
       APP_NAMESPACE: "test_app"
@@ -199,7 +205,7 @@ jobs:
   
   deploy-backend:
     docker:
-      - image: hashicorp/terraform:1.5
+      - image: circleci/python:3.8
     environment:
       AWS_REGION: "us-east-1"
       APP_NAMESPACE: "test_app"
@@ -253,7 +259,7 @@ jobs:
 
   clean-up:
     docker:
-      - image: hashicorp/terraform:1.5
+      - image: circleci/python:3.8
     steps:
       - checkout
       - install_awscli
