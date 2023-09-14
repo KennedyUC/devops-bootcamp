@@ -342,9 +342,11 @@ workflows:
           filters:
             branches:
               only: [dev]
-      - deploy-frontend:
+      - deploy-db:
           requires: [deploy-eks]
       - deploy-backend:
-          requires: [deploy-eks]
+          requires: [deploy-db]
+      - deploy-frontend:
+          requires: [deploy-backend]
       # - clean-up
-          #requires: [deploy-backend, deploy-frontend]
+          #requires: [deploy-frontend]
