@@ -59,6 +59,10 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
+          name: Create the required .env file
+          command: |
+            echo REACT_BASE_API_URL=http://todo-api-service.todo-api.svc:5000 > ./frontend/.env
+      - run:
           name: Install Make
           command: |
             sudo apt-get update
@@ -88,10 +92,6 @@ jobs:
           command: |
             make docker-login DOCKER_REPO=${DOCKER_REPO} DOCKER_PASSWORD=${DOCKER_PASSWORD}
             make build-backend IMAGE_TAG=${CIRCLE_WORKFLOW_ID:0:7}
-      - run:
-          name: Build PostgresQL Database Image
-          command: |
-            make build-db IMAGE_TAG=${CIRCLE_WORKFLOW_ID:0:7}
             
   scan-frontend:
     docker:
@@ -156,6 +156,111 @@ jobs:
             fi
 
       - destroy-eks
+  
+  deploy-db:
+    docker:
+      - image: circleci/python:3.8
+    environment:
+      AWS_REGION: "us-east-1"
+      APP_NAMESPACE: "todo-api"
+      EKS_CLUSTER: "test_cluster"
+    steps:
+      - checkout
+      - install_awscli
+      - run:
+          name: Configure AWS CLI
+          command: |
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
+            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
+            aws configure set default.output csv --profile default
+      - run:
+          name: Update kubectl config with EKS cluster
+          command: |
+            if aws eks --region ${AWS_REGION} describe-cluster --name ${EKS_CLUSTER} 2>&1 | grep -q 'error'; then
+              echo "Error: EKS cluster does not exist or there was an error."
+              exit 1
+            else
+              echo "EKS cluster exists and is active. Updating kubectl config..."
+              aws eks --region ${AWS_REGION} update-kubeconfig --name ${EKS_CLUSTER}
+            fi
+      - run:
+          name: Verify connection to EKS
+          command: kubectl get nodes
+      - run:
+          name: Deploy Database Manifests it does not exist
+          command: |
+            if ! kubectl get ns ${APP_NAMESPACE} > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}
+            fi
+
+            STATEFULSET_NAME=postgresdb
+
+            if ! kubectl get statefulset -n ${APP_NAMESPACE} ${STATEFULSET_NAME} > /dev/null 2>&1; then
+              kubectl apply -n ${APP_NAMESPACE} -f kubernetes/database/
+            else
+              echo "StatefulSet ${STATEFULSET_NAME} already exists in namespace ${APP_NAMESPACE}. Skipping apply."
+            fi
+      - run:
+          name: Verify the deployment
+          command: |
+            kubectl get pods,svc,pvc -n ${APP_NAMESPACE}
+            
+      #- destroy-eks
+
+  deploy-backend:
+    docker:
+      - image: circleci/python:3.8
+    environment:
+      AWS_REGION: "us-east-1"
+      APP_NAMESPACE: "todo-api"
+      EKS_CLUSTER: "test_cluster"
+    steps:
+      - checkout
+      - install_awscli
+      - run:
+          name: Configure AWS CLI
+          command: |
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
+            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
+            aws configure set default.output csv --profile default
+      - run:
+          name: Update kubectl config with EKS cluster
+          command: |
+            if aws eks --region ${AWS_REGION} describe-cluster --name ${EKS_CLUSTER} 2>&1 | grep -q 'error'; then
+              echo "Error: EKS cluster does not exist or there was an error."
+              exit 1
+            else
+              echo "EKS cluster exists and is active. Updating kubectl config..."
+              aws eks --region ${AWS_REGION} update-kubeconfig --name ${EKS_CLUSTER}
+            fi
+      - run:
+          name: Verify connection to EKS
+          command: kubectl get nodes
+      - run:
+          name: Update the backend deployment script with the latest image
+          command: |
+            yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/backend/api-deployment.yaml
+      - run:
+          name: Deploy Application manifests 
+          command: |
+            if ! kubectl get ns ${APP_NAMESPACE} > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}
+            fi
+
+            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/backend/
+            backend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
+            kubectl -n ${APP_NAMESPACE} rollout status deployment/${backend_app_name}
+      - run:
+          name: Wait for application to start
+          command: sleep 100
+      - run:
+          name: Verify the deployment
+          command: |
+            kubectl get pods,svc -n ${APP_NAMESPACE}
+            
+      # - destroy-eks
 
   deploy-frontend:
     docker:
@@ -202,63 +307,8 @@ jobs:
             frontend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
             kubectl -n ${APP_NAMESPACE} rollout status deployment/${frontend_app_name}
       - run:
-          name: Wait for 2 minutes
-          command: sleep 120
-      - run:
-          name: Verify the deployment
-          command: |
-            kubectl get pods,svc -n ${APP_NAMESPACE}
-            
-      # - destroy-eks
-  
-  deploy-backend:
-    docker:
-      - image: circleci/python:3.8
-    environment:
-      AWS_REGION: "us-east-1"
-      APP_NAMESPACE: "todo-api"
-      EKS_CLUSTER: "test_cluster"
-    steps:
-      - checkout
-      - install_awscli
-      - run:
-          name: Configure AWS CLI
-          command: |
-            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
-            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
-            aws configure set default.region ${AWS_REGION} --profile default
-            aws configure set default.output csv --profile default
-      - run:
-          name: Update kubectl config with EKS cluster
-          command: |
-            if aws eks --region ${AWS_REGION} describe-cluster --name ${EKS_CLUSTER} 2>&1 | grep -q 'error'; then
-              echo "Error: EKS cluster does not exist or there was an error."
-              exit 1
-            else
-              echo "EKS cluster exists and is active. Updating kubectl config..."
-              aws eks --region ${AWS_REGION} update-kubeconfig --name ${EKS_CLUSTER}
-            fi
-      - run:
-          name: Verify connection to EKS
-          command: kubectl get nodes
-      - run:
-          name: Update the backend deployment script with the latest image
-          command: |
-            yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/backend/api-deployment.yaml
-            yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/db:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/backend/db-deployment.yaml
-      - run:
-          name: Deploy Application manifests 
-          command: |
-            if ! kubectl get ns ${APP_NAMESPACE} > /dev/null 2>&1; then
-              kubectl create ns ${APP_NAMESPACE}
-            fi
-
-            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/backend/
-            backend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
-            kubectl -n ${APP_NAMESPACE} rollout status deployment/${backend_app_name}
-      - run:
-          name: Wait for 2 minutes
-          command: sleep 120
+          name: Wait for 1 minute
+          command: sleep 60
       - run:
           name: Verify the deployment
           command: |
@@ -277,44 +327,24 @@ jobs:
           command: exit 1
             
       - destroy-eks
-
-  yq-debug:
-    docker:
-      - image: circleci/python:3.8
-    steps:
-      - checkout
-      - run:
-          name: Install yq
-          command: |
-            sudo apt-get update
-            sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-            sudo chmod a+x /usr/local/bin/yq
-      - run:
-          name: Update Backend Manifest
-          command: |
-            yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/backend/api-deployment.yaml
-
-      - run:
-          name: Check Update
-          command: cat ./kubernetes/backend/api-deployment.yaml
           
 workflows:
-  debug:
+  dev:
     jobs:
-      # - build-frontend
-      # - build-backend
-      # - scan-frontend:
-      #     requires: [build-frontend]
-      # - scan-backend:
-      #     requires: [build-backend]
-      # - deploy-eks:
-      #     requires: [scan-frontend, scan-backend]
-      #     filters:
-      #       branches:
-      #         only: [dev]
-      # - deploy-frontend:
-      #     requires: [deploy-eks]
-      # - deploy-backend:
-      #     requires: [deploy-eks]
-      - clean-up
+      - build-frontend
+      - build-backend
+      - scan-frontend:
+          requires: [build-frontend]
+      - scan-backend:
+          requires: [build-backend]
+      - deploy-eks:
+          requires: [scan-frontend, scan-backend]
+          filters:
+            branches:
+              only: [dev]
+      - deploy-frontend:
+          requires: [deploy-eks]
+      - deploy-backend:
+          requires: [deploy-eks]
+      # - clean-up
           #requires: [deploy-backend, deploy-frontend]

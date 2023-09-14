@@ -22,14 +22,16 @@ spec:
     spec:
       containers:
         - name: todo-api
-          image: kennedyuche/todo-api:latest
+          image: kennedyuche/todo-app-api:v1
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
           env:
+            - name: POSTGRES_PORT
+              value: "5432"
             - name: POSTGRES_DB
               value: postgres
-            - name: POSTGRES_SERVER
+            - name: POSTGRES_HOST
               value: postgresdb-0.postgres-db.todo-api.svc
             - name: POSTGRES_USER
               valueFrom:
@@ -41,16 +43,23 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: password
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: secret_key
+            - name: DATABASE_URL
+              value: postgresql://postgres:postgres@postgresdb-0.postgres-db.todo-api.svc:5432/postgres
           livenessProbe:
             httpGet:
               path: /api/v1/status
               port: 5000
-            initialDelaySeconds: 100
+            initialDelaySeconds: 60
           readinessProbe:
             httpGet:
               path: /api/v1/status
               port: 5000
-            initialDelaySeconds: 100
+            initialDelaySeconds: 60
           resources:
             limits:
               cpu: 64m
