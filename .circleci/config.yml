@@ -159,7 +159,7 @@ jobs:
                               -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}"
             fi
 
-      - destroy-infrastructure
+      #- destroy-infrastructure
 
   configure-infrastructure:
     docker:
@@ -184,13 +184,13 @@ jobs:
           command: |
             cd .circleci/ansible
 
-            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
             echo "[instance]" > inventory.txt
             echo $EC2_IP >> inventory.txt
 
             cat inventory.txt
             ansible-playbook -i inventory.txt configure-server.yml
-      #- destroy-infrastructure
+      - destroy-infrastructure
   
   deploy-db:
     docker:
@@ -219,7 +219,7 @@ jobs:
           command: |
             cd .circleci/ansible
 
-            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
             echo "[instance]" > inventory.txt
             echo $EC2_IP >> inventory.txt
 
@@ -258,7 +258,7 @@ jobs:
           command: |
             cd .circleci/ansible
 
-            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
             echo "[instance]" > inventory.txt
             echo $EC2_IP >> inventory.txt
 
@@ -297,7 +297,7 @@ jobs:
           command: |
             cd .circleci/ansible
 
-            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
             echo "[instance]" > inventory.txt
             echo $EC2_IP >> inventory.txt
 
@@ -337,24 +337,24 @@ jobs:
 workflows:
   todo-app-dev:
     jobs:
-      - build-frontend
-      - build-backend
-      - scan-frontend:
-          requires: [build-frontend]
-      - scan-backend:
-          requires: [build-backend]
-      - deploy-infrastructure:
-          requires: [scan-frontend, scan-backend]
-          filters:
-            branches:
-              only: [dev]
-      - configure-infrastructure:
-          requires: [deploy-infrastructure]
-      - deploy-db:
-          requires: [configure-infrastructure]
-      - deploy-backend:
-          requires: [deploy-db]
-      - deploy-frontend:
-          requires: [deploy-backend]
-      # - clean-up
+      # - build-frontend
+      # - build-backend
+      # - scan-frontend:
+      #     requires: [build-frontend]
+      # - scan-backend:
+      #     requires: [build-backend]
+      # - deploy-infrastructure:
+      #     requires: [scan-frontend, scan-backend]
+      #     filters:
+      #       branches:
+      #         only: [dev]
+      # - configure-infrastructure:
+      #     requires: [deploy-infrastructure]
+      # - deploy-db:
+      #     requires: [configure-infrastructure]
+      # - deploy-backend:
+      #     requires: [deploy-db]
+      # - deploy-frontend:
+      #     requires: [deploy-backend]
+      - clean-up
           #requires: [deploy-frontend]
