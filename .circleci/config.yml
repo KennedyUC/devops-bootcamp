@@ -337,24 +337,24 @@ jobs:
 workflows:
   todo-app-dev:
     jobs:
-      # - build-frontend
-      # - build-backend
-      # - scan-frontend:
-      #     requires: [build-frontend]
-      # - scan-backend:
-      #     requires: [build-backend]
-      # - deploy-infrastructure:
-      #     requires: [scan-frontend, scan-backend]
-      #     filters:
-      #       branches:
-      #         only: [dev]
-      # - configure-infrastructure:
-      #     requires: [deploy-infrastructure]
-      # - deploy-db:
-      #     requires: [configure-infrastructure]
-      # - deploy-backend:
-      #     requires: [deploy-db]
-      # - deploy-frontend:
-      #     requires: [deploy-backend]
-      - clean-up
+      - build-frontend
+      - build-backend
+      - scan-frontend:
+          requires: [build-frontend]
+      - scan-backend:
+          requires: [build-backend]
+      - deploy-infrastructure:
+          requires: [scan-frontend, scan-backend]
+          filters:
+            branches:
+              only: [dev]
+      - configure-infrastructure:
+          requires: [deploy-infrastructure]
+      - deploy-db:
+          requires: [configure-infrastructure]
+      - deploy-backend:
+          requires: [deploy-db]
+      - deploy-frontend:
+          requires: [deploy-backend]
+      #- clean-up
           #requires: [deploy-frontend]

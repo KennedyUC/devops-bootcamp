@@ -1,5 +1,5 @@
 - name: 'configuration playbook'
-  hosts: web
+  hosts: instance
   user: ubuntu
   become: true
   become_method: sudo
