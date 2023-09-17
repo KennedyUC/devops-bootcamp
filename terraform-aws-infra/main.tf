@@ -21,6 +21,7 @@ resource "aws_instance" "ec2_instance" {
   instance_type   = var.ec2_instance_type
   key_name        = var.aws_key_pair_name
   security_groups = [aws_security_group.security_group.name]
+  associate_public_ip_address = true
 
   tags = {
     Name        = var.project_name
