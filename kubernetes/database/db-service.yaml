@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: postgres-db
   namespace: todo-api
+  labels:
+    tier: database
 spec:
   selector:
     app: postgres-stateful-db

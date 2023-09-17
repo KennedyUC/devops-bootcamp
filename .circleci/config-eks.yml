@@ -1,0 +1,352 @@
+version: 2.1
+
+commands:
+  install_awscli:
+    description: Install AWSCLI, Tar, GZIP, Kubectl, yq & Curl
+    steps:
+      - run:
+          name: Install AWSCLI, Tar, GZIP, Kubectl, yq & Curl
+          command: |
+            sudo apt install -y tar gzip curl
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+
+            curl -o kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+
+            sudo apt-get update
+            sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+            sudo chmod a+x /usr/local/bin/yq
+
+            TERRAFORM_VERSION=$(curl -s https://api.github.com/repos/hashicorp/terraform/releases/latest | grep tag_name | cut -d: -f2 | tr -d \"\,\v | awk '{$1=$1};1')
+            wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+            unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+            sudo mv terraform /usr/local/bin/
+
+            aws --version
+            kubectl version --client
+            terraform --version
+
+  destroy-eks:
+    description: Destroy the EKS resources given a workflow ID.
+    steps:
+      - run:
+          name: Destroy EKS Resources
+          when: on_fail
+          command: |
+            AWS_REGION="us-east-1"
+            EKS_CLUSTER="test_cluster"
+            echo Destroying EKS Resources for ${CIRCLE_WORKFLOW_ID:0:7}
+
+            if [ "$(basename $PWD)" != "terraform-eks" ]; then
+                cd terraform-eks
+            fi
+          
+            terraform init
+
+            terraform destroy -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
+                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}" \
+                              -var="k8s_cluster_name=${EKS_CLUSTER}"
+            
+jobs:
+  build-frontend:
+    docker:
+      - image: circleci/python:3.8
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Create the required .env file
+          command: |
+            echo REACT_BASE_API_URL=http://todo-api-service.todo-api.svc:5000 > ./frontend/.env
+      - run:
+          name: Install Make
+          command: |
+            sudo apt-get update
+            sudo apt-get install make -y
+            make --version
+      - run:
+          name: Build Frontend Image
+          command: |
+            make docker-login DOCKER_REPO=${DOCKER_REPO} DOCKER_PASSWORD=${DOCKER_PASSWORD}
+            make build-frontend IMAGE_TAG=${CIRCLE_WORKFLOW_ID:0:7}
+
+  build-backend:
+    docker:
+      - image: circleci/python:3.8
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Install Docker and Make
+          command: |
+            sudo apt-get update
+            sudo apt-get install make -y
+            make --version
+      - run:
+          name: Build Backend Image
+          command: |
+            make docker-login DOCKER_REPO=${DOCKER_REPO} DOCKER_PASSWORD=${DOCKER_PASSWORD}
+            make build-backend IMAGE_TAG=${CIRCLE_WORKFLOW_ID:0:7}
+            
+  scan-frontend:
+    docker:
+      - image: circleci/python:3.8
+    steps:
+      - checkout
+      - run:
+          name: Install Trivy
+          command: |
+            wget https://github.com/aquasecurity/trivy/releases/download/v0.20.0/trivy_0.20.0_Linux-64bit.tar.gz
+            tar zxvf trivy_0.20.0_Linux-64bit.tar.gz
+            sudo mv trivy /usr/local/bin/
+      - run:
+          name: Scan Frontend Docker Image
+          command: trivy ${DOCKER_REPO}/web:${CIRCLE_WORKFLOW_ID:0:7}
+
+  scan-backend:
+    docker:
+      - image: circleci/python:3.8
+    steps:
+      - checkout
+      - run:
+          name: Install Trivy
+          command: |
+            wget https://github.com/aquasecurity/trivy/releases/download/v0.20.0/trivy_0.20.0_Linux-64bit.tar.gz
+            tar zxvf trivy_0.20.0_Linux-64bit.tar.gz
+            sudo mv trivy /usr/local/bin/
+      - run:
+          name: Scan Backend Docker Image
+          command: trivy ${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}
+
+  deploy-eks:
+    docker:
+      - image: circleci/python:3.8
+    environment:
+      AWS_REGION: "us-east-1"
+      EKS_CLUSTER: "test_cluster"
+    steps:
+      - checkout
+      - install_awscli
+      - run:
+          name: Configure AWS CLI
+          command: |
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
+            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
+            aws configure set default.output csv --profile default
+      - run:
+          name: Provision EKS Resources
+          command: |
+            cd terraform-eks
+            terraform init
+
+            if aws s3 ls "s3://${STATE_S3_BUCKET}" 2>&1 | grep -q 'NoSuchBucket'; then
+              echo "Bucket does not exist. Aborting EKS deployment..."
+              exit 1
+            else
+              echo "Bucket exists. Proceeding with deployment..."  
+              terraform apply -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
+                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}" \
+                              -var="k8s_cluster_name=${EKS_CLUSTER}"
+            fi
+
+      - destroy-eks
+  
+  deploy-db:
+    docker:
+      - image: circleci/python:3.8
+    environment:
+      AWS_REGION: "us-east-1"
+      APP_NAMESPACE: "todo-api"
+      EKS_CLUSTER: "test_cluster"
+    steps:
+      - checkout
+      - install_awscli
+      - run:
+          name: Configure AWS CLI
+          command: |
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
+            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
+            aws configure set default.output csv --profile default
+      - run:
+          name: Update kubectl config with EKS cluster
+          command: |
+            if aws eks --region ${AWS_REGION} describe-cluster --name ${EKS_CLUSTER} 2>&1 | grep -q 'error'; then
+              echo "Error: EKS cluster does not exist or there was an error."
+              exit 1
+            else
+              echo "EKS cluster exists and is active. Updating kubectl config..."
+              aws eks --region ${AWS_REGION} update-kubeconfig --name ${EKS_CLUSTER}
+            fi
+      - run:
+          name: Verify connection to EKS
+          command: kubectl get nodes
+      - run:
+          name: Deploy Database Manifests it does not exist
+          command: |
+            if ! kubectl get ns ${APP_NAMESPACE} > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}
+            fi
+
+            STATEFULSET_NAME=postgresdb
+
+            if ! kubectl get statefulset -n ${APP_NAMESPACE} ${STATEFULSET_NAME} > /dev/null 2>&1; then
+              kubectl apply -n ${APP_NAMESPACE} -f kubernetes/database/
+            else
+              echo "StatefulSet ${STATEFULSET_NAME} already exists in namespace ${APP_NAMESPACE}. Skipping apply."
+            fi
+      - run:
+          name: Verify the deployment
+          command: |
+            kubectl get pods,svc,pvc -n ${APP_NAMESPACE}
+            
+      #- destroy-eks
+
+  deploy-backend:
+    docker:
+      - image: circleci/python:3.8
+    environment:
+      AWS_REGION: "us-east-1"
+      APP_NAMESPACE: "todo-api"
+      EKS_CLUSTER: "test_cluster"
+    steps:
+      - checkout
+      - install_awscli
+      - run:
+          name: Configure AWS CLI
+          command: |
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
+            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
+            aws configure set default.output csv --profile default
+      - run:
+          name: Update kubectl config with EKS cluster
+          command: |
+            if aws eks --region ${AWS_REGION} describe-cluster --name ${EKS_CLUSTER} 2>&1 | grep -q 'error'; then
+              echo "Error: EKS cluster does not exist or there was an error."
+              exit 1
+            else
+              echo "EKS cluster exists and is active. Updating kubectl config..."
+              aws eks --region ${AWS_REGION} update-kubeconfig --name ${EKS_CLUSTER}
+            fi
+      - run:
+          name: Verify connection to EKS
+          command: kubectl get nodes
+      - run:
+          name: Update the backend deployment script with the latest image
+          command: |
+            yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/backend/api-deployment.yaml
+      - run:
+          name: Deploy Application manifests 
+          command: |
+            if ! kubectl get ns ${APP_NAMESPACE} > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}
+            fi
+
+            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/backend/
+            backend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
+            kubectl -n ${APP_NAMESPACE} rollout status deployment/${backend_app_name}
+      - run:
+          name: Wait for application to start
+          command: sleep 100
+      - run:
+          name: Verify the deployment
+          command: |
+            kubectl get pods,svc -n ${APP_NAMESPACE}
+            
+      # - destroy-eks
+
+  deploy-frontend:
+    docker:
+      - image: circleci/python:3.8
+    environment:
+      AWS_REGION: "us-east-1"
+      APP_NAMESPACE: "todo-web"
+      EKS_CLUSTER: "test_cluster"
+    steps:
+      - checkout
+      - install_awscli
+      - run:
+          name: Configure AWS CLI
+          command: |
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
+            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
+            aws configure set default.output csv --profile default
+      - run:
+          name: Update kubectl config with EKS cluster
+          command: |
+            if aws eks --region ${AWS_REGION} describe-cluster --name ${EKS_CLUSTER} 2>&1 | grep -q 'error'; then
+              echo "Error: EKS cluster does not exist or there was an error."
+              exit 1
+            else
+              echo "EKS cluster exists and is active. Updating kubectl config..."
+              aws eks --region ${AWS_REGION} update-kubeconfig --name ${EKS_CLUSTER}
+            fi
+      - run:
+          name: Verify connection to EKS
+          command: kubectl get nodes
+      - run:
+          name: Update the frontend deployment script with the latest image
+          command: |
+            yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/web:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/frontend/web-deployment.yaml
+      - run:
+          name: Deploy Application manifests 
+          command: |
+            if ! kubectl get ns ${APP_NAMESPACE} > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}
+            fi
+
+            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/frontend/
+            frontend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
+            kubectl -n ${APP_NAMESPACE} rollout status deployment/${frontend_app_name}
+      - run:
+          name: Wait for 1 minute
+          command: sleep 60
+      - run:
+          name: Verify the deployment
+          command: |
+            kubectl get pods,svc -n ${APP_NAMESPACE}
+            
+      # - destroy-eks
+
+  clean-up:
+    docker:
+      - image: circleci/python:3.8
+    steps:
+      - checkout
+      - install_awscli
+      - run:
+          name: Trigger Cleanup
+          command: exit 1
+            
+      - destroy-eks
+          
+workflows:
+  dev:
+    jobs:
+      # - build-frontend
+      # - build-backend
+      # - scan-frontend:
+      #     requires: [build-frontend]
+      # - scan-backend:
+      #     requires: [build-backend]
+      # - deploy-eks:
+      #     requires: [scan-frontend, scan-backend]
+      #     filters:
+      #       branches:
+      #         only: [dev]
+      # - deploy-db:
+      #     requires: [deploy-eks]
+      # - deploy-backend:
+      #     requires: [deploy-db]
+      # - deploy-frontend:
+      #     requires: [deploy-backend]
+      - clean-up
+          #requires: [deploy-frontend]

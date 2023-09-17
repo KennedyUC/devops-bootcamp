@@ -15,6 +15,3 @@ max_node_count      = 4
 node_disk_size      = 20
 ami_type            = "AL2_x86_64"
 capacity_type       = "ON_DEMAND"
-
-# state_s3_bucket       = ""
-# state_file_path     = "*.tfstate"

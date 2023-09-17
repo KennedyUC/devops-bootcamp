@@ -13,6 +13,7 @@ spec:
     metadata:
       labels:
         app: postgres-stateful-db
+        tier: database
     spec:
       containers:
         - name: postgresdb
@@ -47,7 +48,7 @@ spec:
         name: db-data
       spec:
         accessModes: [ "ReadWriteOnce" ]
-        storageClassName: ebs-sc
+        storageClassName: standard
         resources:
           requests:
             storage: 5Gi

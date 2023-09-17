@@ -5,12 +5,11 @@ metadata:
   namespace: todo-web
   labels:
     app: todo-web
-    tier: frontend
 spec:
   selector:
     matchLabels:
       app: todo-web
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:

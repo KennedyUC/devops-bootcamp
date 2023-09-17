@@ -1,0 +1,35 @@
+- name: Create Database Manifests Directory
+  file:
+    path: ~/backend
+    state: directory
+
+- name: Copy Manifest Files to the server
+  synchronize:
+    mode: push
+    src: "{{ role_path }}/files/"
+    dest: ~/backend
+
+- name: Create Namespace if it does not exist
+  shell: |
+    NS=todo-api
+    if kubectl get ns $NS &> /dev/null; then
+    echo "Namespace $NS already exists."
+
+    else
+        kubectl create ns $NS
+        echo "Namespace $NS created."
+    fi
+
+- name: Deploy Backend Manifests
+  shell: |
+    kubectl apply -f backend
+
+- name: View the rollout status
+  shell: |
+    APP_NAMESPACE=todo-api
+    backend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
+    kubectl -n ${APP_NAMESPACE} rollout status deployment/${backend_app_name}
+
+- name: View the Kubernetes Resources
+  shell: |
+    kubectl get pods,svc -n todo-api -l tier=backend

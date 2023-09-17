@@ -5,6 +5,7 @@ metadata:
   namespace: todo-api
   labels:
     app: todo-api
+    tier: backend
 spec:
   selector:
     matchLabels:

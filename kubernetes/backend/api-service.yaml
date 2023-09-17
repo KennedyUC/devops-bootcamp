@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: todo-api-service
   namespace: todo-api
+  labels:
+    tier: backend
 spec:
   type: ClusterIP
   selector:
