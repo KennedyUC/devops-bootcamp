@@ -164,6 +164,8 @@ jobs:
   configure-infrastructure:
     docker:
       - image: circleci/python:3.10
+    environment:
+      AWS_REGION: "us-east-1"
     steps:
       - checkout
       - install_ansible
@@ -193,6 +195,8 @@ jobs:
   deploy-db:
     docker:
       - image: circleci/python:3.10
+    environment:
+      AWS_REGION: "us-east-1"
     steps:
       - checkout
       - install_ansible
@@ -226,6 +230,8 @@ jobs:
   deploy-backend:
     docker:
       - image: circleci/python:3.10
+    environment:
+      AWS_REGION: "us-east-1"
     steps:
       - checkout
       - install_ansible
@@ -263,6 +269,8 @@ jobs:
   deploy-frontend:
     docker:
       - image: circleci/python:3.10
+    environment:
+      AWS_REGION: "us-east-1"
     steps:
       - checkout
       - install_ansible
