@@ -292,8 +292,10 @@ workflows:
           filters:
             branches:
               only: [dev]
-      - deploy-db:
+      - configure-infrastructure:
           requires: [deploy-infrastructure]
+      - deploy-db:
+          requires: [configure-infrastructure]
       - deploy-backend:
           requires: [deploy-db]
       - deploy-frontend:
