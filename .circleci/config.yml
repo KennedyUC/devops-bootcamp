@@ -169,11 +169,23 @@ jobs:
       - install_ansible
       - install_awscli
       - add_ssh_keys:
-          fingerprints: ["32:0b:48:76:92:d9:a4:18:03:82:e8:af:08:e6:6e:b1"] ##update this
+          fingerprints: ["32:0b:48:76:92:d9:a4:18:03:82:e8:af:08:e6:6e:b1"]
+      - run:
+          name: Configure AWS CLI
+          command: |
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
+            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
+            aws configure set default.output csv --profile default
       - run:
           name: Run Configure Server Ansible play
           command: |
             cd .circleci/ansible
+
+            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+            echo "[instance]" > inventory.txt
+            echo $EC2_IP >> inventory.txt
+
             cat inventory.txt
             ansible-playbook -i inventory.txt configure-server.yml
       - destroy-infrastructure
@@ -188,6 +200,13 @@ jobs:
       - add_ssh_keys:
           fingerprints: ["32:0b:48:76:92:d9:a4:18:03:82:e8:af:08:e6:6e:b1"]
       - run:
+          name: Configure AWS CLI
+          command: |
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
+            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
+            aws configure set default.output csv --profile default
+      - run:
           name: Copy Deployment Manifests to Ansible
           command: |
             cp kubernetes/database/* .circleci/ansible/roles/deploy-db/files
@@ -195,6 +214,11 @@ jobs:
           name: Deploy Postgres Database to Minikube Cluster
           command: |
             cd .circleci/ansible
+
+            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+            echo "[instance]" > inventory.txt
+            echo $EC2_IP >> inventory.txt
+
             cat inventory.txt
             ansible-playbook -vvv -i inventory.txt deploy-db.yml
       - destroy-infrastructure
@@ -209,6 +233,13 @@ jobs:
       - add_ssh_keys:
           fingerprints: ["32:0b:48:76:92:d9:a4:18:03:82:e8:af:08:e6:6e:b1"]
       - run:
+          name: Configure AWS CLI
+          command: |
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
+            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
+            aws configure set default.output csv --profile default
+      - run:
           name: Update the backend deployment script with the latest image
           command: |
             yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/backend/api-deployment.yaml
@@ -220,6 +251,11 @@ jobs:
           name: Deploy Backend to Minikube Cluster
           command: |
             cd .circleci/ansible
+
+            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+            echo "[instance]" > inventory.txt
+            echo $EC2_IP >> inventory.txt
+
             cat inventory.txt
             ansible-playbook -vvv -i inventory.txt deploy-backend.yml
       - destroy-infrastructure
@@ -234,6 +270,13 @@ jobs:
       - add_ssh_keys:
           fingerprints: ["32:0b:48:76:92:d9:a4:18:03:82:e8:af:08:e6:6e:b1"]
       - run:
+          name: Configure AWS CLI
+          command: |
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
+            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
+            aws configure set default.output csv --profile default
+      - run:
           name: Update the frontend deployment script with the latest image
           command: |
             yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/web:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/frontend/web-deployment.yaml
@@ -245,6 +288,11 @@ jobs:
           name: Deploy Frontend to Minikube Cluster
           command: |
             cd .circleci/ansible
+
+            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+            echo "[instance]" > inventory.txt
+            echo $EC2_IP >> inventory.txt
+
             cat inventory.txt
             ansible-playbook -vvv -i inventory.txt deploy-frontend.yml
       - destroy-infrastructure
