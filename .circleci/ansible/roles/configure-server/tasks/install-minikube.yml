@@ -1,0 +1,39 @@
+- name: Download Minikube binary
+  get_url:
+    url: "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64"
+    dest: "/usr/local/bin/minikube"
+    mode: '0755'
+
+- name: Add executable to PATH
+  lineinfile:
+    path: /etc/environment
+    line: 'PATH="/usr/local/bin:$PATH"'
+  register: path_changed
+  changed_when: path_changed.changed
+
+- name: Reload shell environment
+  command: source /etc/environment
+  args:
+    creates: "~/.minikube"
+
+- name: Install conntrack
+  apt:
+    name: conntrack
+    state: present
+
+- name: Install Kubectl
+  shell: |
+    wget https://dl.k8s.io/v1.20.15/bin/linux/amd64/kubectl
+    chmod +x ./kubectl
+    sudo mv ./kubectl /usr/local/bin/kubectl
+
+- name: Start Minikube
+  command: minikube start --driver=docker --cpus 2 --memory 4096
+  args:
+    creates: ~/.minikube
+
+- name: Enable Minikube service
+  systemd:
+    name: minikube
+    enabled: yes
+    state: started
