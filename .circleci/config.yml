@@ -213,7 +213,7 @@ jobs:
       - run:
           name: Copy Deployment Manifests to Ansible
           command: |
-            cp kubernetes/database/* .circleci/ansible/roles/deploy-db/files
+            cp kubernetes/database/* devops-bootcamp/.circleci/ansible/roles/deploy-db/files
       - run:
           name: Deploy Postgres Database to Minikube Cluster
           command: |
