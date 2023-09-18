@@ -210,9 +210,12 @@ jobs:
             aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
             aws configure set default.region ${AWS_REGION} --profile default
             aws configure set default.output csv --profile default
+      - attach_workspace:
+          at: ~/
       - run:
           name: Copy Deployment Manifests to Ansible
           command: |
+            mkdir -p ~/devops-bootcamp/.circleci/ansible/roles/deploy-db/files
             cp kubernetes/database/* ~/devops-bootcamp/.circleci/ansible/roles/deploy-db/files
       - run:
           name: Deploy Postgres Database to Minikube Cluster
