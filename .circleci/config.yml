@@ -194,17 +194,13 @@ jobs:
               kubectl create ns ${APP_NAMESPACE}
             fi
 
-            STATEFULSET_NAME=postgresdb
+            AP_NAME=postgresdb
 
-            if ! kubectl get statefulset -n ${APP_NAMESPACE} ${STATEFULSET_NAME} > /dev/null 2>&1; then
+            if ! kubectl get deployment -n ${APP_NAMESPACE} ${AP_NAME} > /dev/null 2>&1; then
               kubectl apply -n ${APP_NAMESPACE} -f kubernetes/database/
             else
-              echo "StatefulSet ${STATEFULSET_NAME} already exists in namespace ${APP_NAMESPACE}. Skipping apply."
+              echo "Deployment ${AP_NAME} already exists in namespace ${APP_NAMESPACE}. Skipping apply."
             fi
-      - run:
-          name: Verify the deployment
-          command: |
-            kubectl get pods,svc,pvc -n ${APP_NAMESPACE}
             
       #- destroy-eks
 
@@ -252,9 +248,6 @@ jobs:
             kubectl apply -n ${APP_NAMESPACE} -f kubernetes/backend/
             backend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
             kubectl -n ${APP_NAMESPACE} rollout status deployment/${backend_app_name}
-      - run:
-          name: Wait for application to start
-          command: sleep 100
       - run:
           name: Verify the deployment
           command: |
@@ -331,22 +324,22 @@ jobs:
 workflows:
   dev:
     jobs:
-      - build-frontend
-      - build-backend
-      - scan-frontend:
-          requires: [build-frontend]
-      - scan-backend:
-          requires: [build-backend]
-      - deploy-eks:
-          requires: [scan-frontend, scan-backend]
-          filters:
-            branches:
-              only: [dev]
-      - deploy-db:
-          requires: [deploy-eks]
-      - deploy-backend:
-          requires: [deploy-db]
-      - deploy-frontend:
-          requires: [deploy-backend]
-      # - clean-up
+      # - build-frontend
+      # - build-backend
+      # - scan-frontend:
+      #     requires: [build-frontend]
+      # - scan-backend:
+      #     requires: [build-backend]
+      # - deploy-eks:
+      #     requires: [scan-frontend, scan-backend]
+      #     filters:
+      #       branches:
+      #         only: [dev]
+      # - deploy-db:
+      #     requires: [deploy-eks]
+      # - deploy-backend:
+      #     requires: [deploy-db]
+      # - deploy-frontend:
+      #     requires: [deploy-backend]
+      - clean-up
           #requires: [deploy-frontend]
