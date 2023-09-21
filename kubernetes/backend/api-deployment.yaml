@@ -33,7 +33,7 @@ spec:
             - name: POSTGRES_DB
               value: postgres
             - name: POSTGRES_HOST
-              value: postgresdb-0.postgres-db.todo-api.svc
+              value: postgres-db.todo-api.svc
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
