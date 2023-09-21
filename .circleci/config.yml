@@ -29,37 +29,31 @@ commands:
             kubectl version --client
             terraform --version
 
-  install_ansible:
-    description: Install Ansible
+  destroy-eks:
+    description: Destroy the EKS resources given a workflow ID.
     steps:
       - run:
-          name: Install Ansible
-          command: |
-            python3 -m pip install --user ansible
-
-  destroy-infrastructure:
-    description: Destroy the AWS resources given a workflow ID.
-    steps:
-      - run:
-          name: Destroy AWS Resources
+          name: Destroy EKS Resources
           when: on_fail
           command: |
             AWS_REGION="us-east-1"
-            echo Destroying AWS Resources for ${CIRCLE_WORKFLOW_ID:0:7}
+            EKS_CLUSTER="test_cluster"
+            echo Destroying EKS Resources for ${CIRCLE_WORKFLOW_ID:0:7}
 
-            if [ "$(basename $PWD)" != "terraform-aws-infra" ]; then
-                cd terraform-aws-infra
+            if [ "$(basename $PWD)" != "terraform-eks" ]; then
+                cd terraform-eks
             fi
           
             terraform init
 
             terraform destroy -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
-                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}"
+                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}" \
+                              -var="k8s_cluster_name=${EKS_CLUSTER}"
             
 jobs:
   build-frontend:
     docker:
-      - image: circleci/python:3.10
+      - image: circleci/python:3.8
     steps:
       - checkout
       - setup_remote_docker:
@@ -82,7 +76,7 @@ jobs:
 
   build-backend:
     docker:
-      - image: circleci/python:3.10
+      - image: circleci/python:3.8
     steps:
       - checkout
       - setup_remote_docker:
@@ -101,7 +95,7 @@ jobs:
             
   scan-frontend:
     docker:
-      - image: circleci/python:3.10
+      - image: circleci/python:3.8
     steps:
       - checkout
       - run:
@@ -116,7 +110,7 @@ jobs:
 
   scan-backend:
     docker:
-      - image: circleci/python:3.10
+      - image: circleci/python:3.8
     steps:
       - checkout
       - run:
@@ -129,11 +123,12 @@ jobs:
           name: Scan Backend Docker Image
           command: trivy ${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}
 
-  deploy-infrastructure:
+  deploy-eks:
     docker:
-      - image: circleci/python:3.10
+      - image: circleci/python:3.8
     environment:
       AWS_REGION: "us-east-1"
+      EKS_CLUSTER: "test_cluster"
     steps:
       - checkout
       - install_awscli
@@ -145,64 +140,33 @@ jobs:
             aws configure set default.region ${AWS_REGION} --profile default
             aws configure set default.output csv --profile default
       - run:
-          name: Provision AWS Resources
+          name: Provision EKS Resources
           command: |
-            cd terraform-aws-infra
+            cd terraform-eks
             terraform init
 
             if aws s3 ls "s3://${STATE_S3_BUCKET}" 2>&1 | grep -q 'NoSuchBucket'; then
-              echo "Bucket does not exist. Aborting AWS Infrastructure Provisioning..."
+              echo "Bucket does not exist. Aborting EKS deployment..."
               exit 1
             else
-              echo "Bucket exists. Proceeding with AWS Infrastructure Provisioning..."  
+              echo "Bucket exists. Proceeding with deployment..."  
               terraform apply -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
-                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}"
+                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}" \
+                              -var="k8s_cluster_name=${EKS_CLUSTER}"
             fi
 
-      #- destroy-infrastructure
-
-  configure-infrastructure:
-    docker:
-      - image: circleci/python:3.10
-    environment:
-      AWS_REGION: "us-east-1"
-    steps:
-      - checkout
-      - install_ansible
-      - install_awscli
-      - add_ssh_keys:
-          fingerprints: ["32:0b:48:76:92:d9:a4:18:03:82:e8:af:08:e6:6e:b1"]
-      - run:
-          name: Configure AWS CLI
-          command: |
-            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
-            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
-            aws configure set default.region ${AWS_REGION} --profile default
-            aws configure set default.output csv --profile default
-      - run:
-          name: Run Configure Server Ansible play
-          command: |
-            cd .circleci/ansible
-
-            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
-            echo "[instance]" > inventory.txt
-            echo $EC2_IP >> inventory.txt
-
-            cat inventory.txt
-            ansible-playbook -vvv -i inventory.txt configure-server.yml
-      - destroy-infrastructure
+      - destroy-eks
   
   deploy-db:
     docker:
-      - image: circleci/python:3.10
+      - image: circleci/python:3.8
     environment:
       AWS_REGION: "us-east-1"
+      APP_NAMESPACE: "todo-api"
+      EKS_CLUSTER: "test_cluster"
     steps:
       - checkout
-      - install_ansible
       - install_awscli
-      - add_ssh_keys:
-          fingerprints: ["32:0b:48:76:92:d9:a4:18:03:82:e8:af:08:e6:6e:b1"]
       - run:
           name: Configure AWS CLI
           command: |
@@ -210,37 +174,50 @@ jobs:
             aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
             aws configure set default.region ${AWS_REGION} --profile default
             aws configure set default.output csv --profile default
-      - attach_workspace:
-          at: ~/
       - run:
-          name: Copy Deployment Manifests to Ansible
+          name: Update kubectl config with EKS cluster
           command: |
-            mkdir -p ~/devops-bootcamp/.circleci/ansible/roles/deploy-db/files
-            cp kubernetes/database/* ~/devops-bootcamp/.circleci/ansible/roles/deploy-db/files
+            if aws eks --region ${AWS_REGION} describe-cluster --name ${EKS_CLUSTER} 2>&1 | grep -q 'error'; then
+              echo "Error: EKS cluster does not exist or there was an error."
+              exit 1
+            else
+              echo "EKS cluster exists and is active. Updating kubectl config..."
+              aws eks --region ${AWS_REGION} update-kubeconfig --name ${EKS_CLUSTER}
+            fi
       - run:
-          name: Deploy Postgres Database to Minikube Cluster
+          name: Verify connection to EKS
+          command: kubectl get nodes
+      - run:
+          name: Deploy Database Manifests it does not exist
           command: |
-            cd .circleci/ansible
+            if ! kubectl get ns ${APP_NAMESPACE} > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}
+            fi
 
-            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
-            echo "[instance]" > inventory.txt
-            echo $EC2_IP >> inventory.txt
+            STATEFULSET_NAME=postgresdb
 
-            cat inventory.txt
-            ansible-playbook -vvv -i inventory.txt deploy-db.yml
-      - destroy-infrastructure
+            if ! kubectl get statefulset -n ${APP_NAMESPACE} ${STATEFULSET_NAME} > /dev/null 2>&1; then
+              kubectl apply -n ${APP_NAMESPACE} -f kubernetes/database/
+            else
+              echo "StatefulSet ${STATEFULSET_NAME} already exists in namespace ${APP_NAMESPACE}. Skipping apply."
+            fi
+      - run:
+          name: Verify the deployment
+          command: |
+            kubectl get pods,svc,pvc -n ${APP_NAMESPACE}
+            
+      #- destroy-eks
 
   deploy-backend:
     docker:
-      - image: circleci/python:3.10
+      - image: circleci/python:3.8
     environment:
       AWS_REGION: "us-east-1"
+      APP_NAMESPACE: "todo-api"
+      EKS_CLUSTER: "test_cluster"
     steps:
       - checkout
-      - install_ansible
       - install_awscli
-      - add_ssh_keys:
-          fingerprints: ["32:0b:48:76:92:d9:a4:18:03:82:e8:af:08:e6:6e:b1"]
       - run:
           name: Configure AWS CLI
           command: |
@@ -248,38 +225,53 @@ jobs:
             aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
             aws configure set default.region ${AWS_REGION} --profile default
             aws configure set default.output csv --profile default
+      - run:
+          name: Update kubectl config with EKS cluster
+          command: |
+            if aws eks --region ${AWS_REGION} describe-cluster --name ${EKS_CLUSTER} 2>&1 | grep -q 'error'; then
+              echo "Error: EKS cluster does not exist or there was an error."
+              exit 1
+            else
+              echo "EKS cluster exists and is active. Updating kubectl config..."
+              aws eks --region ${AWS_REGION} update-kubeconfig --name ${EKS_CLUSTER}
+            fi
+      - run:
+          name: Verify connection to EKS
+          command: kubectl get nodes
       - run:
           name: Update the backend deployment script with the latest image
           command: |
             yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/api:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/backend/api-deployment.yaml
       - run:
-          name: Copy Deployment Manifests to Ansible
+          name: Deploy Application manifests 
           command: |
-            cp kubernetes/backend/* devops-bootcamp/.circleci/ansible/roles/deploy-backend/files
+            if ! kubectl get ns ${APP_NAMESPACE} > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}
+            fi
+
+            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/backend/
+            backend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
+            kubectl -n ${APP_NAMESPACE} rollout status deployment/${backend_app_name}
       - run:
-          name: Deploy Backend to Minikube Cluster
+          name: Wait for application to start
+          command: sleep 100
+      - run:
+          name: Verify the deployment
           command: |
-            cd .circleci/ansible
-
-            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
-            echo "[instance]" > inventory.txt
-            echo $EC2_IP >> inventory.txt
-
-            cat inventory.txt
-            ansible-playbook -vvv -i inventory.txt deploy-backend.yml
-      - destroy-infrastructure
+            kubectl get pods,svc -n ${APP_NAMESPACE}
+            
+      # - destroy-eks
 
   deploy-frontend:
     docker:
-      - image: circleci/python:3.10
+      - image: circleci/python:3.8
     environment:
       AWS_REGION: "us-east-1"
+      APP_NAMESPACE: "todo-web"
+      EKS_CLUSTER: "test_cluster"
     steps:
       - checkout
-      - install_ansible
       - install_awscli
-      - add_ssh_keys:
-          fingerprints: ["32:0b:48:76:92:d9:a4:18:03:82:e8:af:08:e6:6e:b1"]
       - run:
           name: Configure AWS CLI
           command: |
@@ -287,58 +279,57 @@ jobs:
             aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
             aws configure set default.region ${AWS_REGION} --profile default
             aws configure set default.output csv --profile default
+      - run:
+          name: Update kubectl config with EKS cluster
+          command: |
+            if aws eks --region ${AWS_REGION} describe-cluster --name ${EKS_CLUSTER} 2>&1 | grep -q 'error'; then
+              echo "Error: EKS cluster does not exist or there was an error."
+              exit 1
+            else
+              echo "EKS cluster exists and is active. Updating kubectl config..."
+              aws eks --region ${AWS_REGION} update-kubeconfig --name ${EKS_CLUSTER}
+            fi
+      - run:
+          name: Verify connection to EKS
+          command: kubectl get nodes
       - run:
           name: Update the frontend deployment script with the latest image
           command: |
             yq e -i ".spec.template.spec.containers[0].image = \"${DOCKER_REPO}/web:${CIRCLE_WORKFLOW_ID:0:7}\"" ./kubernetes/frontend/web-deployment.yaml
       - run:
-          name: Copy Deployment Manifests to Ansible
+          name: Deploy Application manifests 
           command: |
-            cp kubernetes/frontend/* devops-bootcamp/.circleci/ansible/roles/deploy-frontend/files
+            if ! kubectl get ns ${APP_NAMESPACE} > /dev/null 2>&1; then
+              kubectl create ns ${APP_NAMESPACE}
+            fi
+
+            kubectl apply -n ${APP_NAMESPACE} -f kubernetes/frontend/
+            frontend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
+            kubectl -n ${APP_NAMESPACE} rollout status deployment/${frontend_app_name}
       - run:
-          name: Deploy Frontend to Minikube Cluster
+          name: Wait for 1 minute
+          command: sleep 60
+      - run:
+          name: Verify the deployment
           command: |
-            cd .circleci/ansible
-
-            EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kenn-devops" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
-            echo "[instance]" > inventory.txt
-            echo $EC2_IP >> inventory.txt
-
-            cat inventory.txt
-            ansible-playbook -vvv -i inventory.txt deploy-frontend.yml
-      - destroy-infrastructure
+            kubectl get pods,svc -n ${APP_NAMESPACE}
+            
+      # - destroy-eks
 
   clean-up:
     docker:
-      - image: circleci/python:3.10
-    environment:
-      AWS_REGION: "us-east-1"
+      - image: circleci/python:3.8
     steps:
       - checkout
       - install_awscli
       - run:
-          name: Configure AWS CLI
-          command: |
-            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
-            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
-            aws configure set default.region ${AWS_REGION} --profile default
-            aws configure set default.output csv --profile default
-      - run:
-          name: Destroy AWS Resources
-          command: |
-            echo Destroying AWS Resources for ${CIRCLE_WORKFLOW_ID:0:7}
-
-            if [ "$(basename $PWD)" != "terraform-aws-infra" ]; then
-                cd terraform-aws-infra
-            fi
-          
-            terraform init
-
-            terraform destroy -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
-                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}"
+          name: Trigger Cleanup
+          command: exit 1
+            
+      - destroy-eks
           
 workflows:
-  todo-app-dev:
+  dev:
     jobs:
       - build-frontend
       - build-backend
@@ -346,18 +337,16 @@ workflows:
           requires: [build-frontend]
       - scan-backend:
           requires: [build-backend]
-      - deploy-infrastructure:
+      - deploy-eks:
           requires: [scan-frontend, scan-backend]
           filters:
             branches:
               only: [dev]
-      - configure-infrastructure:
-          requires: [deploy-infrastructure]
       - deploy-db:
-          requires: [configure-infrastructure]
+          requires: [deploy-eks]
       - deploy-backend:
           requires: [deploy-db]
       - deploy-frontend:
           requires: [deploy-backend]
-      #- clean-up
+      # - clean-up
           #requires: [deploy-frontend]
