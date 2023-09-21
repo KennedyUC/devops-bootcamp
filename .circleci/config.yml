@@ -196,13 +196,13 @@ jobs:
 
             AP_NAME=postgresdb
 
-            if ! kubectl get deployment -n ${APP_NAMESPACE} ${AP_NAME} > /dev/null 2>&1; then
+            if ! kubectl -n ${APP_NAMESPACE} get deployment ${AP_NAME} > /dev/null 2>&1; then
               kubectl apply -n ${APP_NAMESPACE} -f kubernetes/database/
             else
               echo "Deployment ${AP_NAME} already exists in namespace ${APP_NAMESPACE}. Skipping apply."
             fi
             
-      #- destroy-eks
+      - destroy-eks
 
   deploy-backend:
     docker:
@@ -253,7 +253,7 @@ jobs:
           command: |
             kubectl get pods,svc -n ${APP_NAMESPACE}
             
-      # - destroy-eks
+      - destroy-eks
 
   deploy-frontend:
     docker:
@@ -307,39 +307,58 @@ jobs:
           command: |
             kubectl get pods,svc -n ${APP_NAMESPACE}
             
-      # - destroy-eks
+      - destroy-eks
 
   clean-up:
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.10
+    environment:
+      AWS_REGION: "us-east-1"
+      EKS_CLUSTER: "test_cluster"
     steps:
       - checkout
       - install_awscli
       - run:
-          name: Trigger Cleanup
-          command: exit 1
-            
-      - destroy-eks
+          name: Configure AWS CLI
+          command: |
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY} --profile default
+            aws configure set aws_secret_access_key ${AWS_SECRET_KEY} --profile default
+            aws configure set default.region ${AWS_REGION} --profile default
+            aws configure set default.output csv --profile default
+      - run:
+          name: Destroy AWS Resources
+          command: |
+            echo Destroying AWS Resources for ${CIRCLE_WORKFLOW_ID:0:7}
+
+            if [ "$(basename $PWD)" != "terraform-eks" ]; then
+                cd terraform-aws-infra
+            fi
+          
+            terraform init
+
+            terraform destroy -auto-approve -var-file="vars.tfvars" -var="user_access_key=${AWS_ACCESS_KEY}" \
+                              -var="user_secret_key=${AWS_SECRET_KEY}" -var="aws_region=${AWS_REGION}" \
+                              -var="k8s_cluster_name=${EKS_CLUSTER}"
           
 workflows:
   dev:
     jobs:
-      - build-frontend
-      - build-backend
-      - scan-frontend:
-          requires: [build-frontend]
-      - scan-backend:
-          requires: [build-backend]
-      - deploy-eks:
-          requires: [scan-frontend, scan-backend]
-          filters:
-            branches:
-              only: [dev]
-      - deploy-db:
-          requires: [deploy-eks]
-      - deploy-backend:
-          requires: [deploy-eks]
-      - deploy-frontend:
-          requires: [deploy-db, deploy-backend]
-      # - clean-up
-          #requires: [deploy-frontend]
+      # - build-frontend
+      # - build-backend
+      # - scan-frontend:
+      #     requires: [build-frontend]
+      # - scan-backend:
+      #     requires: [build-backend]
+      # - deploy-eks:
+      #     requires: [scan-frontend, scan-backend]
+      #     filters:
+      #       branches:
+      #         only: [dev]
+      # - deploy-db:
+      #     requires: [deploy-eks]
+      # - deploy-backend:
+      #     requires: [deploy-db]
+      # - deploy-frontend:
+      #     requires: [deploy-backend]
+      - clean-up
+          # requires: [deploy-frontend]
