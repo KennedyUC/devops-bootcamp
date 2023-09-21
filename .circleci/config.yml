@@ -331,7 +331,7 @@ jobs:
             echo Destroying AWS Resources for ${CIRCLE_WORKFLOW_ID:0:7}
 
             if [ "$(basename $PWD)" != "terraform-eks" ]; then
-                cd terraform-aws-infra
+                cd terraform-eks
             fi
           
             terraform init
