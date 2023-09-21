@@ -9,9 +9,9 @@ subnet_bits         = 8
 k8s_version         = "1.26"
 
 instance_type       = "t3.micro"
-desired_node_count  = 2
-min_node_count      = 1
-max_node_count      = 4
-node_disk_size      = 20
+desired_node_count  = 4
+min_node_count      = 2
+max_node_count      = 6
+node_disk_size      = 80
 ami_type            = "AL2_x86_64"
 capacity_type       = "ON_DEMAND"

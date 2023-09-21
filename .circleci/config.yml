@@ -331,22 +331,22 @@ jobs:
 workflows:
   dev:
     jobs:
-      # - build-frontend
-      # - build-backend
-      # - scan-frontend:
-      #     requires: [build-frontend]
-      # - scan-backend:
-      #     requires: [build-backend]
-      # - deploy-eks:
-      #     requires: [scan-frontend, scan-backend]
-      #     filters:
-      #       branches:
-      #         only: [dev]
-      # - deploy-db:
-      #     requires: [deploy-eks]
-      # - deploy-backend:
-      #     requires: [deploy-db]
-      # - deploy-frontend:
-      #     requires: [deploy-backend]
-      - clean-up
+      - build-frontend
+      - build-backend
+      - scan-frontend:
+          requires: [build-frontend]
+      - scan-backend:
+          requires: [build-backend]
+      - deploy-eks:
+          requires: [scan-frontend, scan-backend]
+          filters:
+            branches:
+              only: [dev]
+      - deploy-db:
+          requires: [deploy-eks]
+      - deploy-backend:
+          requires: [deploy-db]
+      - deploy-frontend:
+          requires: [deploy-backend]
+      # - clean-up
           #requires: [deploy-frontend]
