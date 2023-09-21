@@ -50,7 +50,7 @@ spec:
                   name: postgres-secret
                   key: secret_key
             - name: DATABASE_URL
-              value: postgresql://postgres:postgres@postgresdb-0.postgres-db.todo-api.svc:5432/postgres
+              value: postgresql://postgres:postgres@postgres-db.todo-api.svc:5432/postgres
           livenessProbe:
             httpGet:
               path: /api/v1/status
