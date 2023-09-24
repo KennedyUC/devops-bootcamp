@@ -1,0 +1,33 @@
+- name: Creates Database Manifests Directory
+  file:
+    path: ~/database
+    state: directory
+
+- name: Copy Manifest Files to the server
+  synchronize:
+    mode: push
+    src: "{{ role_path }}/files/"
+    dest: ~/database
+
+- name: Create Namespace if it does not exist
+  shell: |
+    NS=todo-api
+    if kubectl get ns $NS &> /dev/null; then
+    echo "Namespace $NS already exists."
+
+    else
+        kubectl create ns $NS
+        echo "Namespace $NS created."
+    fi
+
+- name: Deploy Database Manifests
+  shell: |
+    kubectl apply -f database
+
+- name: Wait For Deployment to Complete
+  pause:
+    minutes: 2
+
+- name: View the Kubernetes Resources
+  shell: |
+    kubectl get pods,svc -n todo-api -l tier=database

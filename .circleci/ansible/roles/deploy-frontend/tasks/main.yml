@@ -1,0 +1,45 @@
+- name: Create Frontend Manifests Directory
+  file:
+    path: ~/frontend
+    state: directory
+
+- name: Copy Manifest Files to the server
+  synchronize:
+    mode: push
+    src: "{{ role_path }}/files/"
+    dest: ~/frontend
+
+- name: Start Minikube
+  shell: |
+    if ! minikube status &> /dev/null; then
+    echo "Minikube is not running. Starting it..."
+    minikube start
+
+    else
+        echo "Minikube is already running."
+    fi
+
+- name: Create Namespace if it does not exist
+  shell: |
+    NS=todo-web
+    if kubectl get ns $NS &> /dev/null; then
+    echo "Namespace $NS already exists."
+
+    else
+        kubectl create ns $NS
+        echo "Namespace $NS created."
+    fi
+
+- name: Deploy Frontend Manifests
+  shell: |
+    kubectl apply -f frontend
+
+- name: View the rollout status
+  shell: |
+    APP_NAMESPACE=todo-web
+    frontend_app_name=$(kubectl -n ${APP_NAMESPACE} get deployments -o=jsonpath='{.items[0].metadata.name}')
+    kubectl -n ${APP_NAMESPACE} rollout status deployment/${frontend_app_name}
+
+- name: View the Kubernetes Resources
+  shell: |
+    kubectl get pods,svc -n todo-web -l tier=frontend

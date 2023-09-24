@@ -1,4 +1,4 @@
-webVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: todo-web
@@ -9,7 +9,7 @@ spec:
   selector:
     matchLabels:
       app: todo-web
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: todo-web
-          image: kennedyuche/todo-web:latest
+          image: kennedyuche/todo-app-web:v2
           imagePullPolicy: Always
           ports:
             - containerPort: 3000

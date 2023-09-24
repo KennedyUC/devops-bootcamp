@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: postgresdb
   namespace: todo-api
@@ -7,12 +7,12 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: postgres-stateful-db
-  serviceName: postgres-db
+      app: postgres-db
   template:
     metadata:
       labels:
-        app: postgres-stateful-db
+        app: postgres-db
+        tier: database
     spec:
       containers:
         - name: postgresdb
@@ -35,19 +35,3 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: password
-          volumeMounts:
-            - mountPath: /var/lib/postgres/data
-              name: db-data
-      volumes:
-        - name: db-data
-          persistentVolumeClaim:
-            claimName: db-data
-  volumeClaimTemplates:
-    - metadata:
-        name: db-data
-      spec:
-        accessModes: [ "ReadWriteOnce" ]
-        storageClassName: standard
-        resources:
-          requests:
-            storage: 10Gi

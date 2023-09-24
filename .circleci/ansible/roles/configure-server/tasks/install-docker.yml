@@ -1,0 +1,57 @@
+- name: Update apt package list
+  apt:
+    update_cache: yes
+
+- name: Install necessary packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg-agent
+      - software-properties-common
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+    state: present
+
+- name: Update apt package list after adding Docker repo
+  apt:
+    update_cache: yes
+    cache_valid_time: 600
+
+- name: Install Docker
+  apt:
+    name: docker-ce docker-ce-cli containerd.io
+    state: present
+
+- name: Add user to docker group (optional)
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes
+
+- name: Start and enable Docker service
+  service:
+    name: docker
+    enabled: yes
+    state: started
+
+
+# - name: 'Install Minikube'
+#   shell: |
+#     wget https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+#     chmod +x minikube-linux-amd64
+#     sudo mv minikube-linux-amd64 /usr/local/bin/minikube
+
+# - name: 'Install Kubectl'
+#   shell: |
+#     wget https://dl.k8s.io/v1.20.15/bin/linux/amd64/kubectl
+#     chmod +x ./kubectl
+#     sudo mv ./kubectl /usr/local/bin/kubectl

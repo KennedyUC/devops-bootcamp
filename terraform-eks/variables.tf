@@ -88,12 +88,12 @@ variable "user_secret_key" {
   type        = string
 }
 
-variable "state_s3_bucket" {
-  description = "aws s3 bucket for storing the terraform state file"
-  type        = string
-}
+// variable "state_s3_bucket" {
+//   description = "aws s3 bucket for storing the terraform state file"
+//   type        = string
+// }
 
-variable "state_file_path" {
-  description = "path to the state file in s3 bucket"
-  type        = string
-}
+// variable "state_file_path" {
+//   description = "path to the state file in s3 bucket"
+//   type        = string
+// }
